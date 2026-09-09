@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="auto">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>轻记账</title>
+  <meta name="description" content="轻记账 - 本地记账本，数据只存在你的手机里">
+  <meta name="theme-color" content="#16a34a">
+
+  <!-- PWA / iOS 添加到主屏幕 -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="icons/favicon.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="轻记账">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="topbar-title">
+        <span class="brand-dot"></span>
+        <h1>轻记账</h1>
+      </div>
+      <button id="themeToggle" class="icon-btn" title="切换明暗主题" aria-label="切换主题">🌓</button>
+    </header>
+
+    <main id="view">
+      <!-- ============ 记账 ============ -->
+      <section id="view-add" class="view active">
+        <div id="assetsCard"></div>
+        <div id="monthSummary" class="summary-grid"></div>
+        <div id="budgetBanner" class="budget-banner"></div>
+
+        <form id="txForm" class="card" autocomplete="off" novalidate>
+          <div class="seg" id="typeSeg">
+            <button type="button" class="seg-btn seg-expense active" data-type="expense">支出</button>
+            <button type="button" class="seg-btn seg-income" data-type="income">收入</button>
+          </div>
+
+          <div class="amount-row">
+            <span class="currency">¥</span>
+            <input id="amountInput" type="number" inputmode="decimal" step="0.01" min="0"
+                   placeholder="0.00" aria-label="金额">
+          </div>
+
+          <div class="field">
+            <label>分类</label>
+            <div id="categoryChips" class="chips"></div>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label>账户</label>
+              <select id="accountSelect" aria-label="账户"></select>
+            </div>
+            <div class="field">
+              <label>日期</label>
+              <input id="dateInput" type="date" aria-label="日期">
+            </div>
+          </div>
+
+          <div class="field">
+            <label>备注（可选）</label>
+            <input id="noteInput" type="text" placeholder="例如：午饭、地铁…" aria-label="备注">
+          </div>
+
+          <div class="form-actions">
+            <button type="button" id="cancelEditBtn" class="btn btn-ghost" hidden>取消修改</button>
+            <button type="submit" id="saveBtn" class="btn btn-primary">保存</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ============ 账单 ============ -->
+      <section id="view-list" class="view">
+        <div class="card filters">
+          <div class="search-row">
+            <input id="searchInput" type="search" placeholder="搜索金额、分类、备注…" aria-label="搜索">
+          </div>
+          <div class="filter-row">
+            <select id="filterType" aria-label="类型筛选">
+              <option value="">全部类型</option>
+              <option value="income">收入</option>
+              <option value="expense">支出</option>
+            </select>
+            <select id="filterMonth" aria-label="月份筛选"></select>
+            <select id="filterCategory" aria-label="分类筛选"></select>
+            <select id="filterAccount" aria-label="账户筛选"></select>
+          </div>
+          <button type="button" id="clearFiltersBtn" class="btn btn-ghost btn-sm" data-action="clear-filters">清除筛选</button>
+        </div>
+        <div id="listSummary" class="list-summary"></div>
+        <div id="txList" class="tx-list"></div>
+      </section>
+
+      <!-- ============ 统计 ============ -->
+      <section id="view-stats" class="view">
+        <div class="stats-subnav" id="statsSubnav">
+          <button type="button" class="subnav-btn active" data-stat="overview">总览</button>
+          <button type="button" class="subnav-btn" data-stat="month">月度</button>
+          <button type="button" class="subnav-btn" data-stat="day">每日</button>
+          <button type="button" class="subnav-btn" data-stat="year">年度</button>
+          <button type="button" class="subnav-btn" data-stat="account">账户</button>
+        </div>
+
+        <div id="stats-overview" class="stats-sub active">
+          <div id="ovAssets"></div>
+          <div id="ovSummary" class="summary-grid"></div>
+          <div class="card">
+            <h3 class="card-title">账目分析</h3>
+            <div id="analysisList" class="analysis-list"></div>
+          </div>
+        </div>
+
+        <div id="stats-month" class="stats-sub">
+          <div class="stats-head"><h2>月度统计</h2><select id="statsMonth" aria-label="统计月份"></select></div>
+          <div id="statsSummary" class="summary-grid"></div>
+          <div class="card"><h3 class="card-title">支出分类占比</h3><div id="donut" class="chart"></div></div>
+          <div class="card"><h3 class="card-title">收入分类占比</h3><div id="incomeDonut" class="chart"></div></div>
+        </div>
+
+        <div id="stats-day" class="stats-sub">
+          <div class="stats-head"><h2>每日流水</h2><select id="dayMonth" aria-label="每日月份"></select></div>
+          <div id="daySummary" class="summary-grid"></div>
+          <div class="card"><div id="dayChart" class="chart"></div></div>
+        </div>
+
+        <div id="stats-year" class="stats-sub">
+          <div class="stats-head"><h2>年度流水</h2><select id="yearSelect" aria-label="年度"></select></div>
+          <div id="yearSummary" class="summary-grid"></div>
+          <div class="card"><h3 class="card-title">月度收支</h3><div id="yearBar" class="chart"></div></div>
+          <div class="card"><h3 class="card-title">历年对比</h3><div id="yearCompare" class="year-compare"></div></div>
+        </div>
+
+        <div id="stats-account" class="stats-sub">
+          <div class="card"><h3 class="card-title">支出按支付方式</h3><div id="accountDonut" class="chart"></div></div>
+          <div class="card"><h3 class="card-title">收入按支付方式</h3><div id="incomeAccountDonut" class="chart"></div></div>
+          <div class="card"><h3 class="card-title">各账户余额</h3><div id="accountBreakdown" class="account-list"></div></div>
+        </div>
+      </section>
+
+      <!-- ============ 设置 ============ -->
+      <section id="view-settings" class="view">
+        <div class="card">
+          <h3 class="card-title">每月预算</h3>
+          <p class="hint">设为 0 表示不启用预算提醒。</p>
+          <div class="inline-form">
+            <span class="currency">¥</span>
+            <input id="budgetInput" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" aria-label="每月预算">
+            <button type="button" id="budgetSaveBtn" class="btn btn-primary btn-sm">保存</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title">我的账户</h3>
+          <div id="accountList" class="account-list"></div>
+          <div class="inline-form">
+            <input id="newAccountName" type="text" placeholder="账户名称，如：房贷卡" aria-label="新账户名称">
+            <select id="newAccountIcon" aria-label="账户图标">
+              <option value="💰">💰 现金</option>
+              <option value="🏦">🏦 银行</option>
+              <option value="💳">💳 信用卡</option>
+              <option value="💬">💬 微信</option>
+              <option value="🛒">🛒 支付宝</option>
+              <option value="📱">📱 手机</option>
+              <option value="🎯">🎯 其他</option>
+            </select>
+          </div>
+          <div class="inline-form" style="margin-top:8px">
+            <input id="newAccountInit" type="number" inputmode="decimal" step="0.01" min="0" placeholder="初始余额（可选，我已有存款）" aria-label="初始余额">
+            <button type="button" id="addAccountBtn" class="btn btn-primary btn-sm">添加</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title">数据备份</h3>
+          <p class="hint">数据只存在本机，卸载或清除 Safari 数据前请先导出备份。</p>
+          <div class="btn-row">
+            <button type="button" id="exportCsvBtn" class="btn btn-outline">导出 CSV（Excel 可打开）</button>
+            <button type="button" id="exportJsonBtn" class="btn btn-outline">导出完整备份</button>
+          </div>
+          <div class="btn-row import-row">
+            <label class="btn btn-outline btn-file">导入备份
+              <input type="file" id="importJsonInput" accept="application/json,.json" hidden>
+            </label>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title">外观</h3>
+          <div class="seg" id="themeSeg">
+            <button type="button" class="seg-btn" data-theme-opt="auto">自动</button>
+            <button type="button" class="seg-btn" data-theme-opt="light">浅色</button>
+            <button type="button" class="seg-btn" data-theme-opt="dark">深色</button>
+          </div>
+        </div>
+
+        <div class="card danger-card">
+          <h3 class="card-title">危险操作</h3>
+          <button type="button" id="clearDataBtn" class="btn btn-danger">清空所有数据</button>
+        </div>
+
+        <p class="about">轻记账 v1.1 · 数据仅保存在本机</p>
+      </section>
+    </main>
+
+    <nav class="tabbar">
+      <button type="button" class="tab active" data-view="add"><span class="tab-ico">📝</span>记账</button>
+      <button type="button" class="tab" data-view="list"><span class="tab-ico">📋</span>账单</button>
+      <button type="button" class="tab" data-view="stats"><span class="tab-ico">📊</span>统计</button>
+      <button type="button" class="tab" data-view="settings"><span class="tab-ico">⚙️</span>设置</button>
+    </nav>
+  </div>
+
+  <!-- 通用数字输入弹窗 -->
+  <div id="modal" class="modal" hidden>
+    <div class="modal-card">
+      <div class="modal-title" id="modalTitle">设置</div>
+      <p class="hint" id="modalHint"></p>
+      <div class="modal-num"><span class="currency">¥</span><input id="modalInput" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00"></div>
+      <div class="modal-actions">
+        <button type="button" id="modalCancel" class="btn btn-ghost">取消</button>
+        <button type="button" id="modalOk" class="btn btn-primary">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
