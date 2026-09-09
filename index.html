@@ -143,6 +143,21 @@
         </div>
       </section>
 
+      <!-- ============ 便签 ============ -->
+      <section id="view-notes" class="view">
+        <div class="card">
+          <h3 class="card-title">财务便签</h3>
+          <p class="hint">记下这个月要处理的财务事项，处理完就勾掉。</p>
+          <div class="inline-form">
+            <input id="memoInput" type="text" placeholder="例如：15号还信用卡、报销发票…" aria-label="便签内容">
+            <button type="button" id="addNoteBtn" class="btn btn-primary btn-sm">添加</button>
+          </div>
+          <button type="button" id="cancelNoteEditBtn" class="btn btn-ghost btn-sm" hidden style="margin-top:8px">取消编辑</button>
+        </div>
+        <div id="notesSummary" class="list-summary"></div>
+        <div id="notesList" class="notes-list"></div>
+      </section>
+
       <!-- ============ 设置 ============ -->
       <section id="view-settings" class="view">
         <div class="card">
@@ -204,7 +219,7 @@
           <button type="button" id="clearDataBtn" class="btn btn-danger">清空所有数据</button>
         </div>
 
-        <p class="about">轻记账 v1.1 · 数据仅保存在本机</p>
+        <p class="about">轻记账 v1.2 · 数据仅保存在本机</p>
       </section>
     </main>
 
@@ -212,6 +227,7 @@
       <button type="button" class="tab active" data-view="add"><span class="tab-ico">📝</span>记账</button>
       <button type="button" class="tab" data-view="list"><span class="tab-ico">📋</span>账单</button>
       <button type="button" class="tab" data-view="stats"><span class="tab-ico">📊</span>统计</button>
+      <button type="button" class="tab" data-view="notes"><span class="tab-ico">📌</span>便签</button>
       <button type="button" class="tab" data-view="settings"><span class="tab-ico">⚙️</span>设置</button>
     </nav>
   </div>

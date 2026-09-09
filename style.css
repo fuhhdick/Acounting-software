@@ -380,6 +380,23 @@ html[data-theme="dark"] .asset-card { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 .modal-actions { display: flex; gap: 10px; }
 .modal-actions .btn { flex: 1; }
 
+/* ===== 财务便签 ===== */
+.notes-list { display: flex; flex-direction: column; gap: 8px; }
+.note-item {
+  display: flex; align-items: center; gap: 10px; background: var(--card);
+  border: 1px solid var(--border); border-radius: 14px; padding: 12px;
+  box-shadow: var(--shadow);
+}
+.note-check {
+  flex: none; width: 30px; height: 30px; border-radius: 9px; border: 1px solid var(--border);
+  background: var(--card-2); cursor: pointer; font-size: 16px; line-height: 1;
+}
+.note-content { flex: 1; min-width: 0; }
+.note-text { font-size: 15px; font-weight: 500; overflow-wrap: break-word; word-break: break-word; }
+.note-date { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.note-item.done .note-text { text-decoration: line-through; color: var(--muted); }
+.note-item.done { opacity: 0.62; }
+
 /* ===== 桌面适配 ===== */
 @media (min-width: 600px) {
   body { padding: 12px 0; }

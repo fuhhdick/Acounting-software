@@ -32,6 +32,7 @@ function defaultState() {
     transactions: [],
     accounts: DEFAULT_ACCOUNTS.map(a => ({ ...a })),
     budget: { monthly: 0 },
+    notes: [],
     theme: 'auto',
   };
 }
@@ -56,6 +57,7 @@ function load() {
       transactions: Array.isArray(p.transactions) ? p.transactions : [],
       accounts,
       budget: { monthly: Number(p.budget && p.budget.monthly) || 0 },
+      notes: Array.isArray(p.notes) ? p.notes : [],
       theme: ['auto', 'light', 'dark'].includes(p.theme) ? p.theme : 'auto',
     };
   } catch (e) {
@@ -72,6 +74,7 @@ function save() {
 /* ======================= 表单即时状态 ======================= */
 let tx = { type: 'expense', category: null };
 let editingId = null;
+let editingNoteId = null;
 let formAccountId = state.accounts.length ? state.accounts[0].id : '';
 
 const filters = { type: '', month: '', category: '', account: '' };
@@ -194,6 +197,8 @@ const yearSelect = $('yearSelect'), yearSummary = $('yearSummary'), yearBar = $(
 const accountDonut = $('accountDonut'), incomeAccountDonut = $('incomeAccountDonut'), accountBreakdown = $('accountBreakdown');
 const ovAssets = $('ovAssets'), ovSummary = $('ovSummary'), analysisList = $('analysisList');
 const accountList = $('accountList'), budgetInput = $('budgetInput'), themeSeg = $('themeSeg');
+const memoInput = $('memoInput'), addNoteBtn = $('addNoteBtn'), cancelNoteEditBtn = $('cancelNoteEditBtn');
+const notesList = $('notesList'), notesSummary = $('notesSummary');
 
 /* ======================= Toast ======================= */
 let toastTimer = null;
@@ -609,6 +614,91 @@ function renderSettings() {
   }
 }
 
+/* ======================= 渲染：财务便签 ======================= */
+function noteDateLabel(ts) {
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return '';
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const that = new Date(d); that.setHours(0, 0, 0, 0);
+  const diff = Math.round((today - that) / 86400000);
+  if (diff === 0) return '今天';
+  if (diff === 1) return '昨天';
+  return `${d.getMonth() + 1}月${d.getDate()}日`;
+}
+
+function renderNotes() {
+  const pending = state.notes.filter(n => !n.done).length;
+  const done = state.notes.length - pending;
+  notesSummary.innerHTML = `待处理 ${pending} 条 · 已完成 ${done} 条`;
+
+  if (!state.notes.length) {
+    notesList.innerHTML = `<div class="empty"><span class="empty-ico">📌</span>还没有便签，写一条要处理的财务事项吧</div>`;
+    return;
+  }
+  const sorted = [...state.notes].sort((a, b) =>
+    a.done === b.done ? (b.createdAt - a.createdAt) : (a.done ? 1 : -1));
+  notesList.innerHTML = sorted.map(n => `
+    <div class="note-item ${n.done ? 'done' : ''}" data-id="${esc(n.id)}">
+      <button class="note-check" data-action="toggle-note" data-id="${esc(n.id)}" aria-label="切换完成状态">${n.done ? '✅' : '⬜'}</button>
+      <div class="note-content">
+        <div class="note-text">${esc(n.content)}</div>
+        <div class="note-date">${noteDateLabel(n.createdAt)}</div>
+      </div>
+      <button class="op-btn" data-action="edit-note" data-id="${esc(n.id)}" title="编辑">✎</button>
+      <button class="op-btn" data-action="del-note" data-id="${esc(n.id)}" title="删除">🗑</button>
+    </div>`).join('');
+}
+
+function endNoteEdit() {
+  editingNoteId = null;
+  addNoteBtn.textContent = '添加';
+  cancelNoteEditBtn.hidden = true;
+  memoInput.value = '';
+}
+
+function submitNote() {
+  const content = memoInput.value.trim();
+  if (!content) { toast('请输入便签内容'); return; }
+  const wasEditing = editingNoteId;
+  if (wasEditing) {
+    const n = state.notes.find(x => x.id === wasEditing);
+    if (n) n.content = content;
+  } else {
+    state.notes.push({ id: genId(), content, done: false, createdAt: Date.now() });
+  }
+  endNoteEdit();
+  save();
+  renderNotes();
+  toast(wasEditing ? '已更新' : '已添加');
+}
+
+function startNoteEdit(id) {
+  const n = state.notes.find(x => x.id === id);
+  if (!n) return;
+  editingNoteId = id;
+  memoInput.value = n.content;
+  addNoteBtn.textContent = '保存';
+  cancelNoteEditBtn.hidden = false;
+  memoInput.focus();
+}
+
+function toggleNote(id) {
+  const n = state.notes.find(x => x.id === id);
+  if (!n) return;
+  n.done = !n.done;
+  save();
+  renderNotes();
+}
+
+function deleteNote(id) {
+  if (!confirm('确定删除这条便签吗？')) return;
+  state.notes = state.notes.filter(n => n.id !== id);
+  if (editingNoteId === id) endNoteEdit();
+  save();
+  renderNotes();
+  toast('已删除');
+}
+
 /* ======================= 总渲染 ======================= */
 function render() {
   renderAssets();
@@ -619,6 +709,7 @@ function render() {
   renderAccountSelect();
   renderFilterSelects();
   renderList();
+  renderNotes();
   renderStatsNav();
   renderOverview();
   renderMonthStats();
@@ -802,6 +893,7 @@ function importJSON(file) {
         transactions: p.transactions,
         accounts,
         budget: { monthly: Number(p.budget && p.budget.monthly) || 0 },
+        notes: Array.isArray(p.notes) ? p.notes : [],
         theme: ['auto', 'light', 'dark'].includes(p.theme) ? p.theme : d.theme,
       };
       save();
@@ -885,6 +977,17 @@ function bindEvents() {
     if (!btn) return;
     if (btn.dataset.action === 'del-account') deleteAccount(btn.dataset.id);
     if (btn.dataset.action === 'edit-account') editAccountInitial(btn.dataset.id);
+  });
+
+  addNoteBtn.addEventListener('click', submitNote);
+  cancelNoteEditBtn.addEventListener('click', endNoteEdit);
+  memoInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); submitNote(); } });
+  notesList.addEventListener('click', e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    if (btn.dataset.action === 'toggle-note') toggleNote(btn.dataset.id);
+    if (btn.dataset.action === 'edit-note') startNoteEdit(btn.dataset.id);
+    if (btn.dataset.action === 'del-note') deleteNote(btn.dataset.id);
   });
 
   $('statsSubnav').addEventListener('click', e => {
