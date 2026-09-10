@@ -134,6 +134,27 @@ function fmtSignedMoney(n) {
   return (n < 0 ? '−' : '') + '¥' + fmtAmount(n);
 }
 
+function niceCeil(v) {
+  if (!isFinite(v) || v <= 0) return 10;
+  const pow = Math.pow(10, Math.floor(Math.log10(v)));
+  const n = v / pow;
+  const m = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10;
+  return m * pow;
+}
+
+function fmtShort(n) {
+  const v = Math.abs(n);
+  if (v >= 10000) return (n / 10000).toFixed(1).replace(/\.0$/, '') + '万';
+  if (v >= 1000) { const k = n / 1000; return (Number.isInteger(k) ? k : k.toFixed(1)) + 'k'; }
+  return Number.isInteger(v) ? String(v) : v.toFixed(1);
+}
+
+function weekdayCN(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d.getTime())) return '';
+  return ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][d.getDay()];
+}
+
 function byDateDesc(a, b) {
   if (a.date !== b.date) return a.date < b.date ? 1 : -1;
   return (b.createdAt || 0) - (a.createdAt || 0);
@@ -192,7 +213,7 @@ const searchInput = $('searchInput'), listSummary = $('listSummary'), txList = $
 const filterMonth = $('filterMonth'), filterCategory = $('filterCategory'), filterAccount = $('filterAccount');
 const statsMonth = $('statsMonth'), statsSummary = $('statsSummary');
 const donut = $('donut'), incomeDonut = $('incomeDonut');
-const dayMonth = $('dayMonth'), daySummary = $('daySummary'), dayChart = $('dayChart');
+const dayMonth = $('dayMonth'), daySummary = $('daySummary'), dayChart = $('dayChart'), dayList = $('dayList');
 const yearSelect = $('yearSelect'), yearSummary = $('yearSummary'), yearBar = $('yearBar'), yearCompare = $('yearCompare');
 const accountDonut = $('accountDonut'), incomeAccountDonut = $('incomeAccountDonut'), accountBreakdown = $('accountBreakdown');
 const ovAssets = $('ovAssets'), ovSummary = $('ovSummary'), analysisList = $('analysisList');
@@ -512,6 +533,87 @@ function renderMonthStats() {
   incomeDonut.innerHTML = donutBlock(incRows, '总收入');
 }
 
+function dailyChartSVG(series, avgDaily, todayDay) {
+  const W = 360, H = 252, padL = 46, padR = 16, padT = 18, padB = 26;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const rawMax = Math.max(1, avgDaily, ...series.map(s => Math.max(s.income, s.expense)));
+  const step = niceCeil(rawMax / 4);
+  const yMax = step * 4;
+  const x = i => padL + plotW * (i + 0.5) / series.length;
+  const y = v => padT + plotH - (v / yMax) * plotH;
+  const yBase = y(0);
+
+  let grid = '', yLabels = '';
+  for (let t = 0; t <= yMax + 0.001; t += step) {
+    const yy = y(t);
+    grid += `<line x1="${padL}" y1="${yy}" x2="${W - padR}" y2="${yy}" stroke="var(--border)"></line>`;
+    yLabels += `<text x="${padL - 6}" y="${yy + 3}" text-anchor="end" font-size="9" style="fill:var(--muted)">¥${fmtShort(t)}</text>`;
+  }
+
+  let avgLine = '';
+  if (avgDaily > 0) {
+    const ay = y(avgDaily);
+    avgLine = `<line x1="${padL}" y1="${ay}" x2="${W - padR}" y2="${ay}" stroke="var(--warn)" stroke-dasharray="4 3"></line>
+      <text x="${W - padR - 2}" y="${ay - 4}" text-anchor="end" font-size="9" style="fill:var(--warn)">日均 ¥${fmtShort(avgDaily)}</text>`;
+  }
+
+  const barW = Math.max(3, Math.min(10, plotW / series.length * 0.5));
+  let bars = '', pts = [], dots = '';
+  for (let i = 0; i < series.length; i++) {
+    const s = series[i];
+    const cx = x(i);
+    if (s.expense > 0) {
+      const yy = y(s.expense);
+      bars += `<rect x="${cx - barW / 2}" y="${yy}" width="${barW}" height="${Math.max(1, yBase - yy)}" rx="2" style="fill:var(--expense)"><title>${s.day}日 支出 ¥${fmtAmount(s.expense)}</title></rect>`;
+      bars += `<text x="${cx}" y="${yy - 3}" text-anchor="middle" font-size="8" style="fill:var(--expense)">${fmtShort(s.expense)}</text>`;
+    }
+    pts.push(`${cx.toFixed(1)},${y(s.income).toFixed(1)}`);
+    if (s.income > 0) dots += `<circle cx="${cx}" cy="${y(s.income)}" r="2.2" style="fill:var(--income)"><title>${s.day}日 收入 ¥${fmtAmount(s.income)}</title></circle>`;
+  }
+  const line = `<polyline points="${pts.join(' ')}" fill="none" stroke="var(--income)" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"></polyline>`;
+
+  const stepL = Math.ceil(series.length / 10);
+  let xLabels = '';
+  for (let i = 0; i < series.length; i++) {
+    if (i % stepL === 0) {
+      const d = series[i].day;
+      const isToday = d === todayDay;
+      xLabels += `<text x="${x(i)}" y="${H - 8}" text-anchor="middle" font-size="9" ${isToday ? 'font-weight="700"' : ''} style="fill:${isToday ? 'var(--income)' : 'var(--muted)'}">${d}</text>`;
+    }
+  }
+
+  return `<svg width="100%" viewBox="0 0 ${W} ${H}" role="img">${grid}${avgLine}<line x1="${padL}" y1="${yBase}" x2="${W - padR}" y2="${yBase}" stroke="var(--muted)" stroke-width="1"></line>${bars}${line}${dots}${yLabels}${xLabels}</svg>`;
+}
+
+function dailyLegend() {
+  return `<div class="legend-item" style="margin-top:6px"><span class="legend-dot" style="background:var(--expense)"></span><span class="legend-name">支出（柱）</span></div>
+    <div class="legend-item" style="margin-bottom:0"><span class="legend-dot" style="background:var(--income)"></span><span class="legend-name">收入（折线）</span></div>`;
+}
+
+function renderDayList() {
+  const map = {};
+  for (const t of state.transactions) {
+    if (t.date && t.date.slice(0, 7) === dayMonthValue) {
+      const m = map[t.date] || (map[t.date] = { income: 0, expense: 0 });
+      if (t.type === 'income') m.income += t.amount; else m.expense += t.amount;
+    }
+  }
+  const days = Object.keys(map).sort((a, b) => (a < b ? 1 : -1));
+  if (!days.length) { dayList.innerHTML = '<div class="empty">这个月还没有记账</div>'; return; }
+  dayList.innerHTML = days.map(d => {
+    const n = Number(d.slice(8));
+    const wd = weekdayCN(d);
+    const m = map[d];
+    let parts = '';
+    if (m.income > 0) parts += `<span class="day-in">收 ¥${fmtAmount(m.income)}</span>`;
+    if (m.expense > 0) parts += `<span class="day-out">支 ¥${fmtAmount(m.expense)}</span>`;
+    return `<div class="day-row">
+      <span class="day-label">${n}日 <span class="day-week">${wd}</span></span>
+      <span class="day-amounts">${parts}</span>
+    </div>`;
+  }).join('');
+}
+
 function renderDayStats() {
   const months = collectMonths();
   const cur = thisMonthStr();
@@ -520,18 +622,22 @@ function renderDayStats() {
   if (!options.includes(dayMonthValue)) dayMonthValue = options[0];
   dayMonth.value = dayMonthValue;
 
-  const [y, m] = dayMonthValue.split('-').map(Number);
-  const dnum = daysInMonth(y, m);
+  const [yy, mm] = dayMonthValue.split('-').map(Number);
+  const dnum = daysInMonth(yy, mm);
   const series = [];
+  let totalIn = 0, totalOut = 0;
   for (let d = 1; d <= dnum; d++) {
     const ds = `${dayMonthValue}-${pad2(d)}`;
     let income = 0, expense = 0;
     for (const t of state.transactions) if (t.date === ds) { if (t.type === 'income') income += t.amount; else expense += t.amount; }
-    series.push({ label: String(d), income, expense });
+    series.push({ day: d, income, expense });
+    totalIn += income; totalOut += expense;
   }
-  const { income, expense } = totalsForMonth(dayMonthValue);
-  daySummary.innerHTML = summaryGridHTML(income, expense, { in: '本月收入', ox: '本月支出', bal: '本月结余' });
-  dayChart.innerHTML = groupedBarSVG(series) + legendHTML();
+  const avgDaily = totalOut / dnum;
+  const todayDay = dayMonthValue === thisMonthStr() ? new Date().getDate() : -1;
+  daySummary.innerHTML = summaryGridHTML(totalIn, totalOut, {});
+  dayChart.innerHTML = dailyChartSVG(series, avgDaily, todayDay) + dailyLegend();
+  renderDayList();
 }
 
 function renderYearStats() {

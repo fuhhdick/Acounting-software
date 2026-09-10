@@ -397,6 +397,19 @@ html[data-theme="dark"] .asset-card { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 .note-item.done .note-text { text-decoration: line-through; color: var(--muted); }
 .note-item.done { opacity: 0.62; }
 
+/* ===== 每日明细 ===== */
+.day-list { display: flex; flex-direction: column; }
+.day-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 9px 2px; border-bottom: 1px solid var(--border); font-size: 14px;
+}
+.day-row:last-child { border-bottom: none; }
+.day-label { font-weight: 600; white-space: nowrap; }
+.day-week { color: var(--muted); font-weight: 400; font-size: 12px; }
+.day-amounts { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.day-in { color: var(--income); margin-right: 6px; }
+.day-out { color: var(--expense); }
+
 /* ===== 桌面适配 ===== */
 @media (min-width: 600px) {
   body { padding: 12px 0; }
