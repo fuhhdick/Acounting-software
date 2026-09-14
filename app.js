@@ -1088,6 +1088,37 @@ function deleteAccount(id) {
   toast('账户已删除');
 }
 
+function mergeInto(base, src) {
+  base.initialBalance = (base.initialBalance || 0) + (src.initialBalance || 0);
+  for (const t of state.transactions) {
+    if (t.accountId === src.id) {
+      t.accountId = base.id;
+      t.accountName = base.name;
+      t.accountIcon = base.icon;
+    }
+  }
+  state.accounts = state.accounts.filter(a => a.id !== src.id);
+}
+
+function mergeAccountsByIcon() {
+  const groups = new Map();
+  for (const a of state.accounts) {
+    if (!groups.has(a.icon)) groups.set(a.icon, []);
+    groups.get(a.icon).push(a);
+  }
+  const dups = [...groups.values()].filter(g => g.length > 1);
+  if (!dups.length) { toast('没有相同图标的重复账户'); return; }
+  const lines = dups.map(g => g.map(a => a.name).join('　＋　')).join('\n');
+  if (!confirm(`将把相同图标的账户合并成一个（保留每组第一个账户的名字，其余账户的账单和余额都并进去）：\n${lines}\n\n确定合并吗？`)) return;
+  for (const g of dups) {
+    const base = g[0];
+    for (const src of g.slice(1)) mergeInto(base, src);
+  }
+  save();
+  render();
+  toast('已合并相同图标的账户');
+}
+
 function editAccountInitial(id) {
   const a = state.accounts.find(x => x.id === id);
   if (!a) return;
@@ -1276,6 +1307,7 @@ function bindEvents() {
 
   $('budgetSaveBtn').addEventListener('click', saveBudget);
   $('addAccountBtn').addEventListener('click', addAccount);
+  $('mergeAccountsBtn').addEventListener('click', mergeAccountsByIcon);
   $('exportCsvBtn').addEventListener('click', exportCSV);
   $('exportJsonBtn').addEventListener('click', exportJSON);
   $('importJsonInput').addEventListener('change', e => {

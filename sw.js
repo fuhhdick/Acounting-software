@@ -1,7 +1,7 @@
 'use strict';
 
 // 更新应用后，把这里的版本号 +1，用户的手机才会拉到新版本
-const CACHE = 'qingbook-v6';
+const CACHE = 'qingbook-v7';
 
 const ASSETS = [
   './',

@@ -202,22 +202,23 @@
 
         <div class="card">
           <h3 class="card-title">我的账户</h3>
-          <p class="hint">「初始余额」= 开始记账时这个账户里已有的钱，之后的每笔收支会自动加加减减。</p>
+          <p class="hint">现金、微信、支付宝、银行卡已经帮你建好了——点每个账户右边的「初始 ✎」填余额即可，不用新建。只有多加第二张卡等渠道时，才用下面的「添加账户」。</p>
           <div id="accountList" class="account-list"></div>
+          <button type="button" id="mergeAccountsBtn" class="btn btn-outline btn-block" style="margin-bottom:12px">合并相同图标的账户</button>
           <div class="field">
             <label>账户名称</label>
-            <input id="newAccountName" type="text" placeholder="例如：现金、信用卡、房贷卡" aria-label="账户名称">
+            <input id="newAccountName" type="text" placeholder="例如：第二张银行卡、房贷卡" aria-label="账户名称">
           </div>
           <div class="field">
-            <label>图标</label>
+            <label>图标（只是显示用，账户身份由名称区分）</label>
             <select id="newAccountIcon" aria-label="账户图标">
-              <option value="💰">💰 现金</option>
-              <option value="🏦">🏦 银行</option>
-              <option value="💳">💳 信用卡</option>
-              <option value="💬">💬 微信</option>
-              <option value="🛒">🛒 支付宝</option>
-              <option value="📱">📱 手机</option>
-              <option value="🎯">🎯 其他</option>
+              <option value="💰">💰</option>
+              <option value="🏦">🏦</option>
+              <option value="💳">💳</option>
+              <option value="💬">💬</option>
+              <option value="🛒">🛒</option>
+              <option value="📱">📱</option>
+              <option value="🎯">🎯</option>
             </select>
           </div>
           <div class="field">
