@@ -32,6 +32,7 @@
       <!-- ============ 记账 ============ -->
       <section id="view-add" class="view active">
         <div id="assetsCard"></div>
+        <div id="accountBalanceCard"></div>
         <div id="monthSummary" class="summary-grid"></div>
         <div id="budgetBanner" class="budget-banner"></div>
 
@@ -144,6 +145,34 @@
         </div>
       </section>
 
+      <!-- ============ 借贷 ============ -->
+      <section id="view-loans" class="view">
+        <div id="loanSummary" class="summary-grid"></div>
+        <form id="loanForm" class="card" autocomplete="off" novalidate>
+          <div class="seg" id="loanTypeSeg">
+            <button type="button" class="seg-btn seg-income active" data-ltype="lend">借出（别人欠我）</button>
+            <button type="button" class="seg-btn seg-expense" data-ltype="borrow">借入（我欠别人）</button>
+          </div>
+          <div class="amount-row">
+            <span class="currency">¥</span>
+            <input id="loanAmount" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" aria-label="金额">
+          </div>
+          <div class="field">
+            <label>对方</label>
+            <input id="loanPerson" type="text" placeholder="姓名 / 公司，如：张三" aria-label="对方">
+          </div>
+          <div class="field-row">
+            <div class="field"><label>日期</label><input id="loanDate" type="date" aria-label="日期"></div>
+            <div class="field"><label>备注（可选）</label><input id="loanNote" type="text" placeholder="用途" aria-label="备注"></div>
+          </div>
+          <div class="form-actions">
+            <button type="button" id="loanCancelEditBtn" class="btn btn-ghost" hidden>取消</button>
+            <button type="submit" id="loanSaveBtn" class="btn btn-primary">添加</button>
+          </div>
+        </form>
+        <div id="loanList" class="loan-list"></div>
+      </section>
+
       <!-- ============ 便签 ============ -->
       <section id="view-notes" class="view">
         <div class="card">
@@ -173,9 +202,14 @@
 
         <div class="card">
           <h3 class="card-title">我的账户</h3>
+          <p class="hint">「初始余额」= 开始记账时这个账户里已有的钱，之后的每笔收支会自动加加减减。</p>
           <div id="accountList" class="account-list"></div>
-          <div class="inline-form">
-            <input id="newAccountName" type="text" placeholder="账户名称，如：房贷卡" aria-label="新账户名称">
+          <div class="field">
+            <label>账户名称</label>
+            <input id="newAccountName" type="text" placeholder="例如：现金、信用卡、房贷卡" aria-label="账户名称">
+          </div>
+          <div class="field">
+            <label>图标</label>
             <select id="newAccountIcon" aria-label="账户图标">
               <option value="💰">💰 现金</option>
               <option value="🏦">🏦 银行</option>
@@ -186,10 +220,11 @@
               <option value="🎯">🎯 其他</option>
             </select>
           </div>
-          <div class="inline-form" style="margin-top:8px">
-            <input id="newAccountInit" type="number" inputmode="decimal" step="0.01" min="0" placeholder="初始余额（可选，我已有存款）" aria-label="初始余额">
-            <button type="button" id="addAccountBtn" class="btn btn-primary btn-sm">添加</button>
+          <div class="field">
+            <label>初始余额（可选：填已有多少钱，欠款可填负数）</label>
+            <input id="newAccountInit" type="number" inputmode="decimal" step="0.01" placeholder="0.00" aria-label="初始余额">
           </div>
+          <button type="button" id="addAccountBtn" class="btn btn-primary btn-block">添加账户</button>
         </div>
 
         <div class="card">
@@ -220,7 +255,7 @@
           <button type="button" id="clearDataBtn" class="btn btn-danger">清空所有数据</button>
         </div>
 
-        <p class="about">轻记账 v1.2 · 数据仅保存在本机</p>
+        <p class="about">轻记账 v1.3 · 数据仅保存在本机</p>
       </section>
     </main>
 
@@ -228,6 +263,7 @@
       <button type="button" class="tab active" data-view="add"><span class="tab-ico">📝</span>记账</button>
       <button type="button" class="tab" data-view="list"><span class="tab-ico">📋</span>账单</button>
       <button type="button" class="tab" data-view="stats"><span class="tab-ico">📊</span>统计</button>
+      <button type="button" class="tab" data-view="loans"><span class="tab-ico">🤝</span>借贷</button>
       <button type="button" class="tab" data-view="notes"><span class="tab-ico">📌</span>便签</button>
       <button type="button" class="tab" data-view="settings"><span class="tab-ico">⚙️</span>设置</button>
     </nav>
@@ -238,7 +274,7 @@
     <div class="modal-card">
       <div class="modal-title" id="modalTitle">设置</div>
       <p class="hint" id="modalHint"></p>
-      <div class="modal-num"><span class="currency">¥</span><input id="modalInput" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00"></div>
+      <div class="modal-num"><span class="currency">¥</span><input id="modalInput" type="number" inputmode="decimal" step="0.01" placeholder="0.00"></div>
       <div class="modal-actions">
         <button type="button" id="modalCancel" class="btn btn-ghost">取消</button>
         <button type="button" id="modalOk" class="btn btn-primary">确定</button>

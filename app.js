@@ -33,6 +33,7 @@ function defaultState() {
     accounts: DEFAULT_ACCOUNTS.map(a => ({ ...a })),
     budget: { monthly: 0 },
     notes: [],
+    loans: [],
     theme: 'auto',
   };
 }
@@ -58,6 +59,7 @@ function load() {
       accounts,
       budget: { monthly: Number(p.budget && p.budget.monthly) || 0 },
       notes: Array.isArray(p.notes) ? p.notes : [],
+      loans: Array.isArray(p.loans) ? p.loans : [],
       theme: ['auto', 'light', 'dark'].includes(p.theme) ? p.theme : 'auto',
     };
   } catch (e) {
@@ -75,6 +77,8 @@ function save() {
 let tx = { type: 'expense', category: null };
 let editingId = null;
 let editingNoteId = null;
+let editingLoanId = null;
+let loanType = 'lend';
 let formAccountId = state.accounts.length ? state.accounts[0].id : '';
 
 const filters = { type: '', month: '', category: '', account: '' };
@@ -220,6 +224,10 @@ const ovAssets = $('ovAssets'), ovSummary = $('ovSummary'), analysisList = $('an
 const accountList = $('accountList'), budgetInput = $('budgetInput'), themeSeg = $('themeSeg');
 const memoInput = $('memoInput'), addNoteBtn = $('addNoteBtn'), cancelNoteEditBtn = $('cancelNoteEditBtn');
 const notesList = $('notesList'), notesSummary = $('notesSummary');
+const accountBalanceCard = $('accountBalanceCard');
+const loanTypeSeg = $('loanTypeSeg'), loanAmount = $('loanAmount'), loanPerson = $('loanPerson'), loanDate = $('loanDate'), loanNote = $('loanNote');
+const loanSaveBtn = $('loanSaveBtn'), loanCancelEditBtn = $('loanCancelEditBtn');
+const loanSummary = $('loanSummary'), loanList = $('loanList');
 
 /* ======================= Toast ======================= */
 let toastTimer = null;
@@ -260,9 +268,11 @@ function assetCardHTML() {
   const totalIn = totalIncome(), totalOut = totalExpense();
   const net = totalIn - totalOut;
   const initSum = state.accounts.reduce((s, a) => s + (a.initialBalance || 0), 0);
-  return `<div class="asset-card">
-    <div class="asset-label">总资产</div>
-    <div class="asset-value">¥${fmtAmount(totalAssets())}</div>
+  const assets = totalAssets();
+  const neg = assets < 0;
+  return `<div class="asset-card ${neg ? 'neg' : ''}">
+    <div class="asset-label">净资产</div>
+    <div class="asset-value">${neg ? '−' : ''}¥${fmtAmount(assets)}</div>
     <div class="asset-sub">初始存款 ¥${fmtAmount(initSum)} ＋ 累计结余 ${fmtSignedMoney(net)}</div>
   </div>`;
 }
@@ -684,7 +694,7 @@ function renderAccountStats() {
       <span class="acc-ico">${esc(a.icon)}</span>
       <div class="acc-info">
         <div class="acc-name">${esc(a.name)}</div>
-        <div class="acc-balance ${tot.current > 0 ? 'pos' : tot.current < 0 ? 'neg' : ''}">当前 ${fmtSignedMoney(tot.current)}</div>
+        <div class="acc-balance ${tot.current > 0 ? 'pos' : tot.current < 0 ? 'neg' : ''}">余额 ${fmtSignedMoney(tot.current)}</div>
       </div>
       <div class="acc-stats">
         <div class="acc-line">初始 ¥${fmtAmount(a.initialBalance || 0)}</div>
@@ -704,14 +714,13 @@ function renderSettings() {
       <span class="acc-ico">${esc(a.icon)}</span>
       <div class="acc-info">
         <div class="acc-name">${esc(a.name)}</div>
-        <div class="acc-balance ${tot.current > 0 ? 'pos' : tot.current < 0 ? 'neg' : ''}">当前 ${fmtSignedMoney(tot.current)}</div>
+        <div class="acc-balance ${tot.current > 0 ? 'pos' : tot.current < 0 ? 'neg' : ''}">余额 ${fmtSignedMoney(tot.current)}</div>
+        <div class="acc-line">收 ${fmtSignedMoney(tot.income)} · 支 ${fmtSignedMoney(tot.expense)}</div>
       </div>
-      <div class="acc-stats">
-        <div class="acc-line">初始 ¥${fmtAmount(a.initialBalance || 0)}</div>
-        <div class="acc-line">收 ¥${fmtAmount(tot.income)} · 支 ¥${fmtAmount(tot.expense)}</div>
-      </div>
-      <button class="op-btn" data-action="edit-account" data-id="${esc(a.id)}" title="修改初始余额">✎</button>
-      <button class="op-btn" data-action="del-account" data-id="${esc(a.id)}" title="删除账户">🗑</button>
+      <span class="acc-tools">
+        <button class="op-btn link" data-action="edit-account" data-id="${esc(a.id)}" title="点这里设置/修改「初始余额」">初始 ${fmtSignedMoney(a.initialBalance || 0)} ✎</button>
+        <button class="op-btn" data-action="del-account" data-id="${esc(a.id)}" title="删除账户">🗑</button>
+      </span>
     </div>`;
   }).join('');
 
@@ -805,6 +814,145 @@ function deleteNote(id) {
   toast('已删除');
 }
 
+/* ======================= 渲染：各账户余额 ======================= */
+function renderAccountBalances() {
+  const rows = state.accounts.map(a => {
+    const tot = accountTotals(a.id);
+    return `<div class="acc-bal-row">
+      <span class="acc-ico">${esc(a.icon)}</span>
+      <span class="acc-bal-name">${esc(a.name)}</span>
+      <span class="acc-bal-current ${tot.current > 0 ? 'pos' : tot.current < 0 ? 'neg' : ''}">${fmtSignedMoney(tot.current)}</span>
+    </div>`;
+  }).join('');
+  accountBalanceCard.innerHTML = `<div class="card">
+    <h3 class="card-title">各账户余额</h3>
+    <p class="hint" style="margin:0 0 8px">余额已自动算好（初始余额 ＋ 收入 − 支出），不用自己加减</p>
+    <div class="acc-bal-list">${rows}</div>
+  </div>`;
+}
+
+/* ======================= 渲染：借贷 ======================= */
+function loanTotals() {
+  let lend = 0, borrow = 0;
+  for (const l of state.loans) {
+    if (l.settled) continue;
+    if (l.type === 'lend') lend += l.amount; else borrow += l.amount;
+  }
+  return { lend, borrow, net: lend - borrow };
+}
+
+function renderLoanTypeSeg() {
+  for (const b of loanTypeSeg.querySelectorAll('.seg-btn')) {
+    b.classList.toggle('active', b.dataset.ltype === loanType);
+  }
+}
+
+function renderLoanSummary() {
+  const { lend, borrow, net } = loanTotals();
+  loanSummary.innerHTML = `
+    <div class="sum-card sum-income"><div class="sum-label">借出未收回</div><div class="sum-value">¥${fmtAmount(lend)}</div></div>
+    <div class="sum-card sum-expense"><div class="sum-label">借入未还</div><div class="sum-value">¥${fmtAmount(borrow)}</div></div>
+    <div class="sum-card sum-balance"><div class="sum-label">净额</div><div class="sum-value ${net < 0 ? 'neg' : ''}">${fmtSignedMoney(net)}</div></div>`;
+}
+
+function renderLoanList() {
+  const sorted = [...state.loans].sort((a, b) =>
+    a.settled === b.settled ? (b.createdAt - a.createdAt) : (a.settled ? 1 : -1));
+  if (!sorted.length) {
+    loanList.innerHTML = `<div class="empty"><span class="empty-ico">🤝</span>还没有借贷记录，记一笔借出或借入吧</div>`;
+    return;
+  }
+  loanList.innerHTML = sorted.map(l => {
+    const isLend = l.type === 'lend';
+    return `<div class="loan-item ${l.settled ? 'settled' : ''}" data-id="${esc(l.id)}">
+      <span class="loan-badge ${isLend ? 'lend' : 'borrow'}">${isLend ? '借出' : '借入'}</span>
+      <div class="loan-main">
+        <div class="loan-title">${esc(l.person)}${l.note ? ` <span class="loan-note">· ${esc(l.note)}</span>` : ''}</div>
+        <div class="loan-sub">${esc(l.date)} · ${l.settled ? '已还清' : '未还'}</div>
+      </div>
+      <div class="loan-amount ${isLend ? 'income' : 'expense'}">${isLend ? '+' : '−'}¥${fmtAmount(l.amount)}</div>
+      <div class="tx-ops">
+        <button class="op-btn" data-action="toggle-loan" data-id="${esc(l.id)}" title="${l.settled ? '标记未还' : '标记已还清'}">${l.settled ? '↩️' : '✅'}</button>
+        <button class="op-btn" data-action="edit-loan" data-id="${esc(l.id)}" title="编辑">✎</button>
+        <button class="op-btn" data-action="del-loan" data-id="${esc(l.id)}" title="删除">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderLoans() {
+  renderLoanSummary();
+  renderLoanList();
+}
+
+function endLoanEdit() {
+  editingLoanId = null;
+  loanSaveBtn.textContent = '添加';
+  loanCancelEditBtn.hidden = true;
+  loanAmount.value = '';
+  loanPerson.value = '';
+  loanNote.value = '';
+  loanDate.value = todayStr();
+}
+
+function submitLoan(e) {
+  e.preventDefault();
+  const amount = parseFloat(loanAmount.value);
+  if (!isFinite(amount) || amount <= 0) { toast('请输入正确的金额'); return; }
+  const person = loanPerson.value.trim();
+  if (!person) { toast('请输入对方姓名'); return; }
+  const data = {
+    id: editingLoanId || genId(),
+    type: loanType,
+    amount: Math.round(amount * 100) / 100,
+    person,
+    note: loanNote.value.trim(),
+    date: loanDate.value || todayStr(),
+    settled: false,
+    createdAt: Date.now(),
+  };
+  if (editingLoanId) {
+    const i = state.loans.findIndex(x => x.id === editingLoanId);
+    if (i >= 0) { data.settled = state.loans[i].settled; data.createdAt = state.loans[i].createdAt || Date.now(); state.loans[i] = data; }
+  } else {
+    state.loans.push(data);
+  }
+  save();
+  endLoanEdit();
+  renderLoans();
+  toast('已保存');
+}
+
+function startLoanEdit(id) {
+  const l = state.loans.find(x => x.id === id);
+  if (!l) return;
+  editingLoanId = id;
+  loanType = l.type;
+  loanAmount.value = String(l.amount);
+  loanPerson.value = l.person;
+  loanNote.value = l.note || '';
+  loanDate.value = l.date || todayStr();
+  loanSaveBtn.textContent = '保存修改';
+  loanCancelEditBtn.hidden = false;
+  renderLoanTypeSeg();
+}
+
+function toggleLoan(id) {
+  const l = state.loans.find(x => x.id === id);
+  if (!l) return;
+  l.settled = !l.settled;
+  save();
+  renderLoans();
+}
+
+function deleteLoan(id) {
+  if (!confirm('确定删除这条借贷记录吗？')) return;
+  state.loans = state.loans.filter(x => x.id !== id);
+  if (editingLoanId === id) endLoanEdit();
+  save();
+  renderLoans();
+}
+
 /* ======================= 总渲染 ======================= */
 function render() {
   renderAssets();
@@ -816,6 +964,9 @@ function render() {
   renderFilterSelects();
   renderList();
   renderNotes();
+  renderAccountBalances();
+  renderLoanTypeSeg();
+  renderLoans();
   renderStatsNav();
   renderOverview();
   renderMonthStats();
@@ -911,6 +1062,7 @@ function deleteTx(id) {
 function addAccount() {
   const name = $('newAccountName').value.trim();
   if (!name) { toast('请输入账户名称'); return; }
+  if (/^[-+]?\d+(\.\d+)?$/.test(name)) { toast('账户名称不能是纯数字——金额请填到「初始余额」里'); return; }
   if (state.accounts.some(a => a.name === name)) { toast('账户名称已存在'); return; }
   const init = parseFloat($('newAccountInit').value);
   state.accounts.push({
@@ -1000,6 +1152,7 @@ function importJSON(file) {
         accounts,
         budget: { monthly: Number(p.budget && p.budget.monthly) || 0 },
         notes: Array.isArray(p.notes) ? p.notes : [],
+        loans: Array.isArray(p.loans) ? p.loans : [],
         theme: ['auto', 'light', 'dark'].includes(p.theme) ? p.theme : d.theme,
       };
       save();
@@ -1096,6 +1249,22 @@ function bindEvents() {
     if (btn.dataset.action === 'del-note') deleteNote(btn.dataset.id);
   });
 
+  loanTypeSeg.addEventListener('click', e => {
+    const b = e.target.closest('[data-ltype]');
+    if (!b) return;
+    loanType = b.dataset.ltype;
+    renderLoanTypeSeg();
+  });
+  $('loanForm').addEventListener('submit', submitLoan);
+  loanCancelEditBtn.addEventListener('click', endLoanEdit);
+  loanList.addEventListener('click', e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    if (btn.dataset.action === 'toggle-loan') toggleLoan(btn.dataset.id);
+    if (btn.dataset.action === 'edit-loan') startLoanEdit(btn.dataset.id);
+    if (btn.dataset.action === 'del-loan') deleteLoan(btn.dataset.id);
+  });
+
   $('statsSubnav').addEventListener('click', e => {
     const b = e.target.closest('[data-stat]');
     if (b) { statsSub = b.dataset.stat; renderStatsNav(); }
@@ -1144,6 +1313,7 @@ function bindEvents() {
 function init() {
   applyTheme();
   resetForm();
+  endLoanEdit();
   render();
   bindEvents();
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
